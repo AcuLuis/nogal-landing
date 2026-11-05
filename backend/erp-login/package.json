@@ -1,11 +1,13 @@
 {
   "name": "nogal-erp-login",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Lambda de auto-login a ERPNext para la landing de NOGAL. Credenciales por variables de entorno.",
   "type": "module",
   "main": "index.mjs",
+  "license": "MIT",
   "engines": { "node": ">=20" },
   "scripts": {
+    "test": "node --test",
     "zip": "zip -r function.zip index.mjs package.json"
   }
 }
