@@ -18,11 +18,14 @@ en el navegador.
 - [Funcionalidades](#funcionalidades)
 - [Estructura del proyecto](#estructura-del-proyecto)
 - [Ejecutar en local](#ejecutar-en-local)
+- [Pruebas](#pruebas)
 - [Configuración](#configuración)
 - [Despliegue en S3 + CloudFront](#despliegue-en-s3--cloudfront)
 - [Conectar el chat con n8n](#conectar-el-chat-con-n8n)
+- [Funciones Lambda](#funciones-lambda)
 - [Acceso al ERP y Lambda de auto-login](#acceso-al-erp-y-lambda-de-auto-login)
 - [Integración con el resto del sistema](#integración-con-el-resto-del-sistema)
+- [Hoja de ruta](#hoja-de-ruta)
 - [Licencia](#licencia)
 
 ---
@@ -93,8 +96,8 @@ Validación por campo con mensajes claros y foco en el primer error.
 
 - Los productos viven en `frontend/js/data.js`; el catálogo y el asistente leen de ahí, así que el stock
   nunca se contradice entre secciones.
-- Opcionalmente se cargan desde un endpoint (`catalogEndpoint`) con stock en vivo; si falla, se usan los
-  datos locales.
+- Opcionalmente el stock llega en vivo desde ERPNext (`catalogEndpoint`). El endpoint puede devolver solo
+  `[{ "sku", "stock" }]` y se fusiona por SKU con los datos locales; si falla, se usan los datos locales.
 
 **Experiencia y accesibilidad**
 
@@ -108,6 +111,15 @@ Validación por campo con mensajes claros y foco en el primer error.
 **Formulario de contacto**
 
 - Validación por campo, campo trampa contra bots, botón bloqueado mientras envía y timeout de red.
+- Con `contactEndpoint`, la Lambda valida de nuevo en el servidor, limita envíos por IP y entrega la
+  solicitud por correo con Amazon SES; sus errores se muestran en el campo correspondiente.
+
+**Rendimiento, SEO y seguridad**
+
+- Fuentes alojadas en el propio sitio (sin peticiones a terceros) y precargadas.
+- Imagen para redes sociales (Open Graph y Twitter), favicon, icono para móviles, manifest y datos
+  estructurados de la organización.
+- Política de cabeceras para CloudFront (CSP, HSTS, `X-Frame-Options`…) verificada por las pruebas.
 
 ---
 
@@ -115,22 +127,34 @@ Validación por campo con mensajes claros y foco en el primer error.
 
 ```
 nogal-landing/
-├─ frontend/                 # Sitio estático (esto va a S3)
+├─ frontend/                     # Sitio estático (esto va a S3)
 │  ├─ index.html
-│  ├─ css/styles.css         # Sistema de diseño y componentes
+│  ├─ css/styles.css             # Sistema de diseño y componentes
 │  ├─ js/
-│  │  ├─ config.js           # Único archivo a editar para integrar servicios
-│  │  ├─ data.js             # Catálogo: fuente única de productos y stock
-│  │  ├─ chat.js             # Asistente: modo demo o webhook de n8n
-│  │  └─ main.js             # Navegación, catálogo, widget, ERP y formulario
-│  └─ assets/                # Logo e ilustraciones SVG
-├─ backend/
-│  ├─ .env.example           # Variables de entorno de ejemplo
-│  └─ erp-login/             # Lambda de auto-login a ERPNext
-│     ├─ index.mjs
-│     ├─ index.test.mjs      # Pruebas con node:test
-│     └─ package.json
-├─ docs/screenshots/         # Capturas usadas en este README
+│  │  ├─ config.js               # Único archivo a editar para integrar servicios
+│  │  ├─ data.js                 # Catálogo: fuente única de productos y stock
+│  │  ├─ chat.js                 # Asistente: modo demo o webhook de n8n
+│  │  └─ main.js                 # Navegación, catálogo, widget, ERP y formulario
+│  ├─ assets/                    # Logo, ilustraciones, iconos e imagen social
+│  ├─ fonts/                     # Fraunces e Inter (woff2) con su licencia OFL
+│  ├─ site.webmanifest
+│  └─ robots.txt
+├─ backend/                      # Funciones Lambda (Node.js 20, sin dependencias)
+│  ├─ .env.example
+│  ├─ erp-login/                 # Auto-login de demo al ERP
+│  ├─ catalog-stock/             # Stock en vivo desde ERPNext
+│  └─ contact/                   # Formulario de contacto con Amazon SES
+├─ infra/
+│  └─ cloudfront-security-headers.json
+├─ scripts/
+│  ├─ serve.mjs                  # Servidor local
+│  ├─ deploy.sh                  # Despliegue a S3 + CloudFront
+│  └─ screenshots.mjs            # Regenera las capturas del README
+├─ tests/                        # Pruebas en navegador real
+├─ docs/
+│  ├─ produccion.md              # Guía para pasar de demo a producción
+│  └─ screenshots/
+├─ package.json
 ├─ LICENSE
 └─ README.md
 ```
@@ -139,19 +163,35 @@ nogal-landing/
 
 ## Ejecutar en local
 
-El frontend no necesita instalación. Cualquier servidor estático sirve:
+Requisitos: **Node.js 22 o superior**. No hay dependencias que instalar.
 
 ```bash
-cd frontend
-python -m http.server 8080     # http://localhost:8080
+npm start          # http://localhost:8080
 ```
 
-Pruebas de la Lambda (Node.js 20 o superior, sin dependencias):
+También sirve cualquier servidor estático, por ejemplo `cd frontend && python -m http.server 8080`.
+
+---
+
+## Pruebas
+
+Todo se ejecuta en local, sin servicios externos ni integración continua.
 
 ```bash
-cd backend/erp-login
-npm test
+npm test               # todo
+npm run test:backend   # funciones Lambda (node:test)
+npm run test:e2e       # la landing en Chrome/Edge sin interfaz
 ```
+
+- **Backend:** validaciones, cookies del auto-login, caché y errores del stock, límite por IP y campo
+  trampa del formulario.
+- **Navegador:** asistente (incluida la protección contra HTML inyectado), catálogo en vivo, formulario
+  con respuestas 400/429 del servidor, navegación móvil, fuentes locales y funcionamiento con la misma CSP
+  que usa CloudFront.
+
+Las pruebas de navegador buscan Chrome, Chromium o Edge en las rutas habituales; si está en otra ruta,
+defínela en `CHROME_PATH`. Para regenerar las capturas de este README: `npm run screenshots`
+(o `SITE_URL=https://... npm run screenshots` para capturar el sitio desplegado).
 
 ---
 
@@ -174,20 +214,25 @@ Todo se ajusta en `frontend/js/config.js`. No contiene secretos, solo URLs públ
 
 ## Despliegue en S3 + CloudFront
 
+Una sola vez: crear el bucket (`aws s3 mb s3://nogal-landing`) y una distribución de CloudFront con
+origen en ese bucket (OAC + HTTPS, objeto raíz `index.html`).
+
+Cada despliegue se hace desde tu equipo con la AWS CLI:
+
 ```bash
-# 1. Crear el bucket (nombre único)
-aws s3 mb s3://nogal-landing
-
-# 2. Subir solo la carpeta frontend/
-aws s3 sync frontend/ s3://nogal-landing --delete
-
-# 3. Servir detrás de CloudFront (OAC + HTTPS), root object: index.html
-#    Invalidar la caché tras cada despliegue:
-aws cloudfront create-invalidation --distribution-id <TU_ID> --paths "/*"
+BUCKET=nogal-landing DISTRIBUTION_ID=<ID> SITE_URL=https://<dominio> ./scripts/deploy.sh
 ```
 
-Cabeceras sugeridas: `Cache-Control: max-age=31536000` para `assets/` y `css/`, y
-`max-age=0, must-revalidate` para `index.html` y `js/config.js`.
+El script:
+
+- Sube `frontend/` con la caché adecuada para cada tipo de archivo: fuentes inmutables, imágenes una
+  semana, CSS/JS una hora, y HTML y `config.js` siempre revalidados.
+- Con `SITE_URL`, vuelve absolutas las URLs de Open Graph, agrega la URL canónica y genera `sitemap.xml`.
+- Invalida la caché de CloudFront al terminar.
+
+Para revisar antes de subir, usa `DRY_RUN=1` o `OUT_DIR=./build`; este último solo prepara los archivos
+y no sube nada. Las cabeceras de seguridad y el resto de la puesta en producción están en
+[docs/produccion.md](docs/produccion.md).
 
 ---
 
@@ -213,6 +258,19 @@ real basta con pegar la URL del webhook en `config.js`. Lo que hay que acordar c
 5. **HTTPS** en el endpoint: una página servida por HTTPS no puede llamar a `http://`.
 6. *(Opcional)* Usar el `sessionId` para mantener el contexto de la conversación. Se conserva mientras la
    pestaña siga abierta y se renueva con "Nueva conversación".
+
+---
+
+## Funciones Lambda
+
+Las tres usan Node.js 20, no tienen dependencias y se configuran por variables de entorno
+(`backend/.env.example`). El paso a paso para crearlas está en [docs/produccion.md](docs/produccion.md).
+
+| Función | Qué hace | Se conecta con |
+|---------|----------|----------------|
+| `catalog-stock` | Lee existencias de ERPNext (doctype *Bin*) con una API key de solo lectura y devuelve `{ products: [{ sku, stock }] }` con caché corta | `catalogEndpoint` |
+| `contact` | Valida la solicitud, descarta bots, limita por IP y la envía por correo con Amazon SES | `contactEndpoint` |
+| `erp-login` | Inicia sesión de demo en ERPNext y redirige con la cookie de sesión | `erpLoginEndpoint` |
 
 ---
 
@@ -248,8 +306,10 @@ aws lambda create-function \
   --role arn:aws:iam::<CUENTA>:role/<ROL_LAMBDA>
 ```
 
-> El auto-login con credenciales compartidas es válido solo para una demo académica. En producción se
-> usaría SSO u OAuth por usuario. El archivo `.env` real está en `.gitignore`.
+> El auto-login con credenciales compartidas es válido solo para una demo académica. En producción cada
+> persona entra con su propia cuenta mediante SSO; los pasos están en
+> [docs/produccion.md](docs/produccion.md#6-sso-por-usuario-reemplazo-del-auto-login). El archivo `.env`
+> real está en `.gitignore`.
 
 ---
 
@@ -262,6 +322,21 @@ aws lambda create-function \
 | Analítica | AWS Glue + Athena / QuickSight | Sección "Reportes y analítica al día" |
 | Hosting | S3 + CloudFront | Todo el frontend estático |
 | Auth demo | AWS Lambda | Auto-login opcional al ERP |
+| Stock en vivo | AWS Lambda + ERPNext API | Catálogo y asistente en modo demo |
+| Contacto | AWS Lambda + Amazon SES | Formulario de contacto |
+
+---
+
+## Hoja de ruta
+
+| Fase | Contenido | Estado |
+|------|-----------|--------|
+| 1. Correcciones críticas | Escape de HTML en el chat, cookie del auto-login, desbordamiento en móvil | Completada |
+| 2. Lógica funcional | Conversación única y persistente, fuente única de stock, Lambda robusta | Completada |
+| 3. UX y accesibilidad | Contraste AA, foco visible, menú y widget accesibles, validación por campo | Completada |
+| 4. Integración real | Lambdas de stock y contacto, fusión de stock por SKU, errores del servidor en el formulario | Código completado · falta HTTPS en ERP/n8n y desplegar ([guía](docs/produccion.md)) |
+| 5. Marca, SEO y rendimiento | Logo nuevo, fuentes locales, Open Graph, iconos, manifest, datos estructurados, sitemap | Completada |
+| 6. Producción | Cabeceras de seguridad, despliegue con caché, pruebas locales, guía de WAF, alarmas y SSO | Código completado · falta aplicar en AWS y ERPNext ([guía](docs/produccion.md)) |
 
 ---
 
@@ -270,6 +345,9 @@ aws lambda create-function \
 Este proyecto se distribuye bajo la licencia **MIT**. Puedes usarlo, copiarlo, modificarlo y
 distribuirlo libremente, siempre que conserves el aviso de copyright. Consulta el archivo
 [LICENSE](LICENSE) para ver el texto completo.
+
+Las fuentes **Fraunces** e **Inter** incluidas en `frontend/fonts/` se distribuyen bajo la
+[SIL Open Font License 1.1](frontend/fonts/OFL-Inter.txt); su licencia acompaña a los archivos.
 
 ---
 
