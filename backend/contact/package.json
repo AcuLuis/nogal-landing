@@ -1,0 +1,13 @@
+{
+  "name": "nogal-contact",
+  "version": "1.0.0",
+  "description": "Lambda del formulario de contacto de la landing de NOGAL (envío con Amazon SES).",
+  "type": "module",
+  "main": "index.mjs",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test",
+    "zip": "zip -r function.zip index.mjs package.json"
+  }
+}

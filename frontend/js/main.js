@@ -101,8 +101,35 @@
     reveal(grid.querySelectorAll(".reveal"));
   }
 
-  function isValidProduct(p) {
-    return p && typeof p.name === "string" && typeof p.sku === "string" && isFinite(p.stock);
+  function hasStock(p) {
+    return p && typeof p.sku === "string" && p.stock !== null && p.stock !== "" && isFinite(p.stock);
+  }
+  function isFullProduct(p) {
+    return hasStock(p) && typeof p.name === "string" && typeof p.unit === "string";
+  }
+
+  /* El endpoint puede devolver productos completos o solo el stock
+     ([{ sku, stock }]). Lo recibido se fusiona por SKU con los datos locales;
+     los SKU desconocidos solo se agregan si traen la ficha completa. */
+  function mergeProducts(local, remote) {
+    var bySku = {};
+    remote.forEach(function (it) { if (hasStock(it)) bySku[it.sku] = it; });
+    var matched = 0;
+    var merged = local.map(function (p) {
+      var it = bySku[p.sku];
+      if (!it) return p;
+      matched++;
+      delete bySku[p.sku];
+      var copy = {}, k;
+      for (k in p) copy[k] = p[k];
+      for (k in it) copy[k] = it[k];
+      copy.stock = Number(it.stock);
+      return copy;
+    });
+    Object.keys(bySku).forEach(function (sku) {
+      if (isFullProduct(bySku[sku])) { merged.push(bySku[sku]); matched++; }
+    });
+    return matched ? merged : null;
   }
 
   renderCatalog(DATA.products);
@@ -112,9 +139,10 @@
       .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function (json) {
         var list = Array.isArray(json) ? json : json && json.products;
-        if (!Array.isArray(list) || !list.length || !list.every(isValidProduct)) throw new Error("formato inválido");
-        DATA.products = list; // el asistente demo también pasa a usar estos datos
-        renderCatalog(list);
+        var merged = Array.isArray(list) && mergeProducts(DATA.products, list);
+        if (!merged) throw new Error("respuesta sin productos reconocibles");
+        DATA.products = merged; // el asistente demo también pasa a usar estos datos
+        renderCatalog(merged);
         if (catalogNote) {
           catalogNote.textContent = "Stock sincronizado a las " +
             new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) + ".";
@@ -246,7 +274,14 @@
         signal: ctrl ? ctrl.signal : undefined
       }).then(function (r) {
         if (timer) clearTimeout(timer);
-        if (!r.ok) throw new Error("HTTP " + r.status);
+        if (r.ok) return;
+        // Se adjunta la respuesta del servidor (errores por campo, 429…).
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          var err = new Error("HTTP " + r.status);
+          err.status = r.status;
+          err.body = body || {};
+          throw err;
+        });
       }, function (err) {
         if (timer) clearTimeout(timer);
         throw err;
@@ -287,8 +322,18 @@
       setStatus("", "");
       postJson(CFG.contactEndpoint, payload)
         .then(done)
-        .catch(function () {
-          setStatus("error", "No se pudo enviar. Inténtalo de nuevo o escríbenos a ventas@nogal-muebles.com.");
+        .catch(function (err) {
+          var fieldErrors = err && err.body && err.body.fields;
+          if (err && err.status === 400 && fieldErrors && (fieldErrors.name || fieldErrors.email)) {
+            if (fieldErrors.name) setError(fields.name, "Revisa tu nombre y empresa.");
+            if (fieldErrors.email) setError(fields.email, "Revisa el formato del correo.");
+            setStatus("error", "Revisa los campos marcados.");
+            (fieldErrors.name ? fields.name : fields.email).focus();
+          } else if (err && err.status === 429) {
+            setStatus("error", "Recibimos varias solicitudes seguidas. Espera unos minutos e inténtalo de nuevo.");
+          } else {
+            setStatus("error", "No se pudo enviar. Inténtalo de nuevo o escríbenos a ventas@nogal-muebles.com.");
+          }
         })
         .then(function () {
           submitBtn.disabled = false;

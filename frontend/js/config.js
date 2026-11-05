@@ -41,14 +41,16 @@ window.NOGAL_CONFIG = {
      erpLoginEndpoint: si despliegas la Lambda de backend/erp-login,
      pega aquí su URL pública. Vacío => login normal del ERP.
      ------------------------------------------------------------------ */
+  // Cambiar a https:// en cuanto el ERP tenga certificado (docs/produccion.md).
   erpUrl: "http://erp.theartificialmachine.com",
   erpLoginEndpoint: "",
 
   /* ------------------------------------------------------------------
      3) CATÁLOGO — Stock en vivo (opcional)
-     Endpoint GET que devuelve un array de productos con el mismo
-     formato que js/data.js (o { "products": [...] }). Si falla o está
-     vacío, se muestran los datos locales.
+     Endpoint GET (Lambda backend/catalog-stock) que devuelve
+     { "products": [{ "sku": "MES-NOG", "stock": 42 }, ...] }. El stock se
+     fusiona por SKU con js/data.js; también acepta fichas completas.
+     Si falla o está vacío, se muestran los datos locales.
      ------------------------------------------------------------------ */
   catalogEndpoint: "",
 

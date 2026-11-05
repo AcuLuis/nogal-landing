@@ -1,0 +1,13 @@
+{
+  "name": "nogal-catalog-stock",
+  "version": "1.0.0",
+  "description": "Lambda que expone el stock de ERPNext para el catálogo de la landing de NOGAL.",
+  "type": "module",
+  "main": "index.mjs",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test",
+    "zip": "zip -r function.zip index.mjs package.json"
+  }
+}
