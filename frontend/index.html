@@ -7,18 +7,53 @@
   <meta name="description" content="NOGAL: manufactura de muebles de madera peruana digitalizada con ERP, asistente de inventario con IA y analítica de negocio en la nube (AWS)." />
   <meta name="theme-color" content="#6d4a32" />
 
-  <!-- Open Graph -->
+  <!-- Open Graph / Twitter
+       scripts/deploy.sh convierte og:image en URL absoluta usando SITE_URL. -->
   <meta property="og:title" content="NOGAL — Manufactura de Muebles Inteligente" />
   <meta property="og:description" content="Muebles de madera de precisión, operados con ERP + IA + analítica en la nube." />
   <meta property="og:type" content="website" />
+  <meta property="og:locale" content="es_PE" />
+  <meta property="og:image" content="assets/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="NOGAL — Madera con oficio, operación con inteligencia." />
+  <meta name="twitter:card" content="summary_large_image" />
 
-  <!-- Tipografía (Google Fonts — compatible con S3/CloudFront) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Tipografía alojada en el propio sitio (sin dependencias externas) -->
+  <link rel="preload" href="fonts/fraunces-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
 
   <link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+  <link rel="manifest" href="site.webmanifest" />
   <link rel="stylesheet" href="css/styles.css" />
+
+  <!-- Datos estructurados para buscadores -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "NOGAL Manufactura de Muebles S.A.C.",
+    "description": "Manufactura de muebles de madera peruana operada con ERP, asistente de inventario con IA y analítica en la nube.",
+    "logo": "assets/icon-512.png",
+    "email": "ventas@nogal-muebles.com",
+    "telephone": "+51 54 555 120",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Parque Industrial Río Seco, Mz. J",
+      "addressLocality": "Arequipa",
+      "addressCountry": "PE"
+    },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "contactType": "sales",
+      "telephone": "+51 54 555 120",
+      "areaServed": "PE",
+      "availableLanguage": "es"
+    }
+  }
+  </script>
 </head>
 <body>
   <a class="skip-link" href="#top">Saltar al contenido</a>

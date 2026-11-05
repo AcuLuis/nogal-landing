@@ -4,6 +4,22 @@
    Paleta de tonos madera/tierra cálidos. Mobile-first.
    ========================================================================== */
 
+/* ---------- 0. Fuentes (alojadas en /fonts, licencia OFL) ------------------ */
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+  src: url("../fonts/fraunces-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../fonts/inter-latin.woff2") format("woff2");
+}
+
 /* ---------- 1. Design tokens ------------------------------------------------ */
 :root {
   /* Paleta — tintes naturales */
