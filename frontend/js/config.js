@@ -11,18 +11,15 @@ window.NOGAL_CONFIG = {
   /* ------------------------------------------------------------------
      1) CHAT — Webhook del agente de IA (n8n en AWS ECS)
      Pega aquí la URL del webhook de PRODUCCIÓN de n8n. Mientras esté
-     vacío (""), el chat funciona en MODO DEMO con respuestas simuladas.
+     vacío (""), el chat funciona en MODO DEMO con respuestas simuladas
+     a partir de js/data.js.
 
-     Según la infraestructura desplegada (template.yml), n8n corre en
-     ECS Fargate (puerto 5678) detrás del ALB en la ruta "/n8n/", con
-     host n8n.theartificialmachine.com. El webhook tendrá la forma:
-       http://n8n.theartificialmachine.com/webhook/<ruta-del-workflow>
-     (pídele al equipo de backend la <ruta> exacta del workflow).
+     n8n corre en ECS Fargate detrás del ALB, con host
+     n8n.theartificialmachine.com. El webhook tendrá la forma:
+       https://n8n.theartificialmachine.com/webhook/<ruta-del-workflow>
 
-     ⚠️ OJO MIXED-CONTENT: si esta landing se sirve por HTTPS (CloudFront)
-     y el webhook es HTTP, el navegador bloqueará el fetch. Solución:
-     poner HTTPS en n8n (recomendado) o servir la landing por HTTP en la
-     demo. Ver README → "Cómo conectar el chat con n8n".
+     OJO MIXED-CONTENT: si la landing se sirve por HTTPS (CloudFront) y el
+     webhook es HTTP, el navegador bloqueará la petición. Usa HTTPS en n8n.
      ------------------------------------------------------------------ */
   chatWebhookUrl: "",
 
@@ -30,20 +27,34 @@ window.NOGAL_CONFIG = {
      El body enviado será: { [chatMessageKey]: "texto", sessionId: "..." } */
   chatMessageKey: "message",
 
-  /* Ruta dentro del JSON de respuesta de n8n donde está el texto a mostrar.
-     Se prueban en orden; la primera que exista se usa.
-     Ej: respuesta { "output": "..." } → deja "output" en la lista. */
+  /* Claves del JSON de respuesta donde puede venir el texto a mostrar.
+     Se prueban en orden; la primera que exista se usa. */
   chatResponsePaths: ["reply", "output", "text", "answer", "message"],
 
+  /* Tiempo máximo de espera de la respuesta del agente (ms). */
+  chatTimeoutMs: 20000,
+
   /* ------------------------------------------------------------------
-     2) ERP — Auto-login (opcional)
-     Si despliegas la Lambda de backend/, pega aquí su Function URL.
-     Vacío ("") => el botón lleva a la página normal de login del ERP.
+     2) ERP — URL base y auto-login (opcional)
+     erpUrl: URL base de ERPNext, sin barra final. El botón de acceso
+     lleva a <erpUrl>/login.
+     erpLoginEndpoint: si despliegas la Lambda de backend/erp-login,
+     pega aquí su URL pública. Vacío => login normal del ERP.
      ------------------------------------------------------------------ */
+  erpUrl: "http://erp.theartificialmachine.com",
   erpLoginEndpoint: "",
 
   /* ------------------------------------------------------------------
-     3) CONTACTO — Endpoint del formulario (opcional)
+     3) CATÁLOGO — Stock en vivo (opcional)
+     Endpoint GET que devuelve un array de productos con el mismo
+     formato que js/data.js (o { "products": [...] }). Si falla o está
+     vacío, se muestran los datos locales.
+     ------------------------------------------------------------------ */
+  catalogEndpoint: "",
+
+  /* ------------------------------------------------------------------
+     4) CONTACTO — Endpoint del formulario (opcional)
+     Recibe un POST JSON { name, email, interest, message }.
      Vacío => el formulario solo valida y muestra confirmación local.
      ------------------------------------------------------------------ */
   contactEndpoint: ""
