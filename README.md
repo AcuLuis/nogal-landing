@@ -1,143 +1,242 @@
 # NOGAL — Landing de Manufactura de Muebles Inteligente
 
-Frontend estático de una empresa de muebles de madera peruana ficticia (**NOGAL**) que digitalizó su
-operación con **ERPNext + agente de IA (n8n/Bedrock) + analítica (Glue/Athena/QuickSight)**
-sobre AWS. Proyecto académico de arquitectura cloud.
+Frontend estático de **NOGAL**, una empresa ficticia de muebles de madera peruana que digitalizó su
+operación con **ERPNext**, un **agente de IA** (n8n + Amazon Bedrock) y **analítica** (Glue, Athena y
+QuickSight) sobre AWS. Es un proyecto académico de arquitectura cloud.
 
-La landing es **100% estática** (HTML/CSS/JS plano) para desplegarse en **S3 + CloudFront**,
-con **una Lambda opcional** para el auto-login al ERP sin exponer credenciales.
+La landing es HTML, CSS y JavaScript plano, sin frameworks ni build, pensada para servirse desde
+**S3 + CloudFront**. Incluye una **Lambda opcional** para el auto-login al ERP sin exponer credenciales
+en el navegador.
+
+![Inicio de la landing NOGAL](docs/screenshots/01-inicio.png)
 
 ---
 
-## 📁 Estructura
+## Contenido
+
+- [Capturas](#capturas)
+- [Funcionalidades](#funcionalidades)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Ejecutar en local](#ejecutar-en-local)
+- [Configuración](#configuración)
+- [Despliegue en S3 + CloudFront](#despliegue-en-s3--cloudfront)
+- [Conectar el chat con n8n](#conectar-el-chat-con-n8n)
+- [Acceso al ERP y Lambda de auto-login](#acceso-al-erp-y-lambda-de-auto-login)
+- [Integración con el resto del sistema](#integración-con-el-resto-del-sistema)
+- [Licencia](#licencia)
+
+---
+
+## Capturas
+
+### Cómo trabajamos
+
+Los tres pilares de la operación: ERP, asistente de inventario y analítica.
+
+![Sección Cómo trabajamos](docs/screenshots/02-como-trabajamos.png)
+
+### Asistente de inventario
+
+Chat que responde preguntas sobre stock, pedidos y reposición. Funciona en modo demo con datos locales o
+conectado al webhook real de n8n.
+
+![Asistente de inventario](docs/screenshots/03-asistente.png)
+
+### Catálogo
+
+Tarjetas generadas desde una única fuente de datos, con aviso de stock bajo y un botón para consultar
+cada producto al asistente.
+
+![Catálogo de productos](docs/screenshots/04-catalogo.png)
+
+### Widget flotante
+
+El botón "Consultar al asistente" abre el chat flotante con la pregunta ya enviada. La conversación es la
+misma que en la sección del asistente.
+
+![Widget flotante del asistente](docs/screenshots/05-widget-flotante.png)
+
+### Acceso al ERP
+
+![Acceso al ERP](docs/screenshots/06-acceso-erp.png)
+
+### Contacto
+
+Validación por campo con mensajes claros y foco en el primer error.
+
+![Formulario de contacto](docs/screenshots/07-contacto.png)
+
+### Móvil
+
+<p align="center">
+  <img src="docs/screenshots/08-movil-inicio.png" alt="Inicio en móvil" width="280" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/09-movil-chat.png" alt="Asistente en móvil" width="280" />
+</p>
+
+---
+
+## Funcionalidades
+
+**Asistente de inventario**
+
+- Una sola conversación compartida entre la ventana de la sección y el widget flotante.
+- El historial se conserva al recargar la pestaña (`sessionStorage`) y se puede reiniciar con
+  "Nueva conversación".
+- Evita envíos en paralelo, muestra indicador de escritura y corta la espera a los 20 s.
+- Las respuestas del webhook se escapan antes de mostrarse: solo se admite `**negrita**` y saltos de
+  línea, nunca HTML.
+- En modo demo entiende preguntas sin importar tildes ni mayúsculas, varios productos en una misma
+  pregunta, pedidos del día, rotación, acabados y alertas de reposición.
+
+**Catálogo**
+
+- Los productos viven en `frontend/js/data.js`; el catálogo y el asistente leen de ahí, así que el stock
+  nunca se contradice entre secciones.
+- Opcionalmente se cargan desde un endpoint (`catalogEndpoint`) con stock en vivo; si falla, se usan los
+  datos locales.
+
+**Experiencia y accesibilidad**
+
+- Enlace "Saltar al contenido", foco visible en todos los controles y contraste AA en textos.
+- Menú móvil que se cierra con `Esc`, al tocar fuera o al pasar a escritorio.
+- La navegación resalta la sección visible.
+- El widget flotante se oculta mientras el chat de la sección está en pantalla y, cerrado, no recibe
+  foco con el teclado.
+- Respeta `prefers-reduced-motion`.
+
+**Formulario de contacto**
+
+- Validación por campo, campo trampa contra bots, botón bloqueado mientras envía y timeout de red.
+
+---
+
+## Estructura del proyecto
 
 ```
-CLOUD/
+nogal-landing/
 ├─ frontend/                 # Sitio estático (esto va a S3)
-│  ├─ index.html             # Página completa (todas las secciones)
-│  ├─ css/
-│  │  └─ styles.css          # Sistema de diseño + componentes
+│  ├─ index.html
+│  ├─ css/styles.css         # Sistema de diseño y componentes
 │  ├─ js/
-│  │  ├─ config.js           # ← ÚNICO archivo a editar para integrar servicios
-│  │  ├─ chat.js             # Asistente: mock local o webhook n8n
-│  │  └─ main.js             # Navbar, reveal, widget flotante, formulario
-│  └─ assets/                # Logo + imágenes SVG de mobiliario/madera (no se rompen)
-│
+│  │  ├─ config.js           # Único archivo a editar para integrar servicios
+│  │  ├─ data.js             # Catálogo: fuente única de productos y stock
+│  │  ├─ chat.js             # Asistente: modo demo o webhook de n8n
+│  │  └─ main.js             # Navegación, catálogo, widget, ERP y formulario
+│  └─ assets/                # Logo e ilustraciones SVG
 ├─ backend/
-│  ├─ .env.example           # Variables de entorno (credenciales demo)
+│  ├─ .env.example           # Variables de entorno de ejemplo
 │  └─ erp-login/             # Lambda de auto-login a ERPNext
 │     ├─ index.mjs
+│     ├─ index.test.mjs      # Pruebas con node:test
 │     └─ package.json
-│
-├─ .gitignore
+├─ docs/screenshots/         # Capturas usadas en este README
+├─ LICENSE
 └─ README.md
 ```
 
 ---
 
-## 🎨 Diseño
+## Ejecutar en local
 
-- **Paleta (tonos madera / tierra cálidos):** crema `#FBF7F0`, terracota `#B4532E`,
-  ocre `#D8A24A`, índigo `#27333B`, espresso `#241E1A`, taupe `#8A7A6D`.
-- **Tipografía:** *Fraunces* (serif display) para titulares + *Inter* para cuerpo.
-- **Mobile-first**, responsive, `prefers-reduced-motion` respetado, imágenes con
-  `loading="lazy"` y SVG vectoriales (peso mínimo, nunca rotas).
+El frontend no necesita instalación. Cualquier servidor estático sirve:
+
+```bash
+cd frontend
+python -m http.server 8080     # http://localhost:8080
+```
+
+Pruebas de la Lambda (Node.js 20 o superior, sin dependencias):
+
+```bash
+cd backend/erp-login
+npm test
+```
 
 ---
 
-## 🚀 Despliegue del frontend (S3 + CloudFront)
+## Configuración
+
+Todo se ajusta en `frontend/js/config.js`. No contiene secretos, solo URLs públicas.
+
+| Clave | Para qué sirve | Vacío |
+|-------|----------------|-------|
+| `chatWebhookUrl` | Webhook de producción de n8n | Chat en modo demo |
+| `chatMessageKey` | Campo donde viaja la pregunta | `message` |
+| `chatResponsePaths` | Claves donde buscar la respuesta | `reply`, `output`, `text`… |
+| `chatTimeoutMs` | Tiempo máximo de espera del agente | 20000 |
+| `erpUrl` | URL base de ERPNext | — |
+| `erpLoginEndpoint` | URL pública de la Lambda de auto-login | Login normal del ERP |
+| `catalogEndpoint` | GET con la lista de productos en vivo | Datos de `data.js` |
+| `contactEndpoint` | POST JSON del formulario | Confirmación local |
+
+---
+
+## Despliegue en S3 + CloudFront
 
 ```bash
 # 1. Crear el bucket (nombre único)
 aws s3 mb s3://nogal-landing
 
-# 2. Subir el sitio (solo la carpeta frontend/)
+# 2. Subir solo la carpeta frontend/
 aws s3 sync frontend/ s3://nogal-landing --delete
 
-# 3. Servir detrás de CloudFront (recomendado: OAC + HTTPS)
-#    - Origin: el bucket S3
-#    - Default root object: index.html
-#    - Invalida la caché tras cada deploy:
+# 3. Servir detrás de CloudFront (OAC + HTTPS), root object: index.html
+#    Invalidar la caché tras cada despliegue:
 aws cloudfront create-invalidation --distribution-id <TU_ID> --paths "/*"
 ```
 
-> Cabeceras sugeridas: `Cache-Control: max-age=31536000` para `assets/` y
-> `css/`, y `max-age=0, must-revalidate` para `index.html`.
-
-Para probar en local, cualquier servidor estático sirve:
-
-```bash
-cd frontend
-python -m http.server 8080     # → http://localhost:8080
-```
+Cabeceras sugeridas: `Cache-Control: max-age=31536000` para `assets/` y `css/`, y
+`max-age=0, must-revalidate` para `index.html` y `js/config.js`.
 
 ---
 
-## 🤖 Cómo conectar el chat con el agente real de n8n
+## Conectar el chat con n8n
 
-**Estado actual:** el chat funciona en **modo demo** (respuestas simuladas en
-`chat.js`). Para conectarlo al agente real solo edita `frontend/js/config.js`:
+Mientras `chatWebhookUrl` esté vacío, el chat responde con datos de ejemplo. Para conectarlo al agente
+real basta con pegar la URL del webhook en `config.js`. Lo que hay que acordar con el equipo de n8n:
 
-```js
-window.NOGAL_CONFIG = {
-  chatWebhookUrl: "https://TU-N8N/webhook/inventario",  // ← pega la URL aquí
-  chatMessageKey: "message",                            // campo que envía la pregunta
-  chatResponsePaths: ["reply", "output", "text"],       // dónde leer la respuesta
-  ...
-};
-```
-
-### ✅ Checklist — qué pedirle al equipo de backend (n8n)
-
-Para conectar el chat necesito **una sola cosa: la URL del webhook**, más su
-contrato de entrada/salida. Pídele al equipo:
-
-1. **URL del webhook de producción** del workflow de n8n en ECS.
-   - Ej: `https://n8n.theartificialmachine.com/webhook/inventario`
-   - Que sea el webhook **Production** (no el de *Test*, que solo vive tras pulsar “Execute”).
-
-2. **Método y formato de entrada.** Este frontend envía por defecto:
+1. **URL del webhook de producción** (no la de *Test*), por ejemplo
+   `https://n8n.theartificialmachine.com/webhook/inventario`.
+2. **Formato de entrada.** El frontend envía:
    ```http
    POST <webhook>
    Content-Type: application/json
 
    { "message": "¿cuántos tablones de roble quedan?", "sessionId": "nogal-xxxx" }
    ```
-   → Si n8n espera otro nombre de campo (p. ej. `chatInput` o `query`), ajusta
-   `chatMessageKey` en `config.js`.
-
-3. **Formato de salida (JSON).** Que el nodo *Respond to Webhook* devuelva algo como:
-   ```json
-   { "reply": "Quedan 1,240 pies tabla de tablón de madera (SKU TAB-STD)." }
-   ```
-   → Si la clave es distinta (`output`, `text`, `answer`…), agrégala a
-   `chatResponsePaths`. El código ya tolera `[{ "json": {...} }]` y `{ "data": {...} }`.
-
-4. **CORS habilitado** en el webhook para el dominio de CloudFront:
-   `Access-Control-Allow-Origin: https://<tu-distribucion>.cloudfront.net`
-   (y responder a `OPTIONS`). Sin esto, el navegador bloqueará la llamada.
-
-5. **HTTPS** en el endpoint (CloudFront sirve por HTTPS; no puede llamar a `http://`).
-
-6. *(Opcional)* Si el agente mantiene contexto de conversación, que use el
-   `sessionId` que ya enviamos para hilar el historial por usuario.
-
-> Con esos 6 puntos resueltos, conectar el chat es cambiar **una línea** en `config.js`.
+   Si n8n espera otro nombre de campo (`chatInput`, `query`…), se cambia `chatMessageKey`.
+3. **Formato de salida.** El nodo *Respond to Webhook* debe devolver algo como
+   `{ "reply": "Quedan 1,240 pies tabla (SKU TAB-STD)." }`. Si la clave es otra, se agrega a
+   `chatResponsePaths`. También se aceptan `[{ "json": {...} }]` y `{ "data": {...} }`.
+4. **CORS** habilitado para el dominio de CloudFront, respondiendo también a `OPTIONS`.
+5. **HTTPS** en el endpoint: una página servida por HTTPS no puede llamar a `http://`.
+6. *(Opcional)* Usar el `sessionId` para mantener el contexto de la conversación. Se conserva mientras la
+   pestaña siga abierta y se renueva con "Nueva conversación".
 
 ---
 
-## 🔐 Acceso al ERP sin credenciales en el cliente
+## Acceso al ERP y Lambda de auto-login
 
-El botón **“Iniciar sesión en ERPNext”** NO contiene usuario/clave. Dos modos:
+El botón "Iniciar sesión en ERPNext" no contiene usuario ni clave. Hay dos modos:
 
-- **Sin backend (por defecto):** el botón lleva a
-  `http://erp.theartificialmachine.com/login` y el usuario ingresa sus datos.
-- **Con auto-login (demo):** despliega la Lambda `backend/erp-login/`. Guarda las
-  credenciales como **variables de entorno** (ver `backend/.env.example`), hace el
-  login contra `/api/method/login` de ERPNext y redirige con la cookie de sesión.
-  Luego pega su *Function URL* en `config.js → erpLoginEndpoint`.
+- **Sin backend (por defecto):** lleva a `<erpUrl>/login` y el usuario ingresa sus datos.
+- **Con auto-login (demo):** la Lambda `backend/erp-login/` lee las credenciales de variables de entorno,
+  inicia sesión contra `/api/method/login` de ERPNext y redirige al escritorio con la cookie de sesión.
+  Si algo falla, redirige al login normal en lugar de mostrar un error.
 
-### Desplegar la Lambda
+**Requisito de dominio.** Un navegador solo guarda cookies para el dominio que las emite. Si la Lambda
+responde desde `*.lambda-url.<region>.on.aws`, la sesión no llega al ERP. Por eso hay que publicarla en un
+subdominio del mismo dominio del ERP (por ejemplo `login.theartificialmachine.com`, mediante CloudFront o
+API Gateway con dominio propio) y definir `COOKIE_DOMAIN=.theartificialmachine.com`.
+
+| Variable | Descripción |
+|----------|-------------|
+| `ERP_URL` | URL base de ERPNext, sin barra final |
+| `ERP_USERNAME` / `ERP_PASSWORD` | Credenciales de demo (nunca en el repo) |
+| `COOKIE_DOMAIN` | Dominio padre compartido con el ERP |
+| `ALLOW_ORIGIN` | Origen de la landing; el resto va al login normal |
+| `REDIRECT_PATH` | Ruta tras iniciar sesión (por defecto `/app`) |
 
 ```bash
 cd backend/erp-login
@@ -147,31 +246,43 @@ aws lambda create-function \
   --runtime nodejs20.x --handler index.handler \
   --zip-file fileb://function.zip \
   --role arn:aws:iam::<CUENTA>:role/<ROL_LAMBDA>
-# Variables de entorno: ERP_URL, ERP_USERNAME, ERP_PASSWORD, ALLOW_ORIGIN
-# Habilita una Function URL (Auth: NONE para demo) y usa esa URL en config.js
 ```
 
-> ⚠️ El auto-login con credenciales compartidas es válido **solo para demo
-> académica**. En producción real se usaría SSO/OAuth por usuario. El
-> `.env` real está en `.gitignore` — nunca se versiona.
+> El auto-login con credenciales compartidas es válido solo para una demo académica. En producción se
+> usaría SSO u OAuth por usuario. El archivo `.env` real está en `.gitignore`.
 
 ---
 
-## 🧩 Integración con el resto del sistema (mapa)
+## Integración con el resto del sistema
 
 | Capa | Servicio | Dónde se refleja en la landing |
 |------|----------|--------------------------------|
-| ERP | ERPNext | Botón “Acceso al sistema” + datos del catálogo |
-| Agente IA | n8n (ECS/ECR) + Amazon Bedrock | Widget de chat “Preguntar por inventario” |
-| Analítica | AWS Glue (ETL) + Athena / QuickSight | Sección “Reportes y analítica al día” |
+| ERP | ERPNext | Botón "Acceso al sistema" y datos del catálogo |
+| Agente IA | n8n (ECS/ECR) + Amazon Bedrock | Asistente de inventario |
+| Analítica | AWS Glue + Athena / QuickSight | Sección "Reportes y analítica al día" |
 | Hosting | S3 + CloudFront | Todo el frontend estático |
 | Auth demo | AWS Lambda | Auto-login opcional al ERP |
 
 ---
 
-## ✔️ Verificación de enlaces (hecha)
+## Licencia
 
-- Navegación interna (`#sistema`, `#asistente`, `#catalogo`, `#contacto`, `#acceso`) → OK.
-- Botón de login → `erp.theartificialmachine.com` (o Lambda si se configura).
-- Chat demo y widget flotante → responden con mock; hook a n8n listo.
-- Formulario de contacto → valida y confirma (envía a `contactEndpoint` si se define).
+Este proyecto se distribuye bajo la licencia **MIT**. Puedes usarlo, copiarlo, modificarlo y
+distribuirlo libremente, siempre que conserves el aviso de copyright. Consulta el archivo
+[LICENSE](LICENSE) para ver el texto completo.
+
+---
+
+## ⭐ ¿Te gustó el proyecto?
+
+Si este proyecto te resultó útil o simplemente te gustó, me harías muy feliz regalándole una
+estrella en GitHub. ✨ Es un gesto pequeño que me motiva a seguir construyendo y compartiendo
+más proyectos como este. 🪵
+
+<p align="center">
+  <a href="https://github.com/AcuLuis/nogal-landing">
+    <img src="https://img.shields.io/github/stars/AcuLuis/nogal-landing?style=social" alt="Dale una estrella en GitHub" />
+  </a>
+</p>
+
+<p align="center">¡Gracias por pasar por aquí! 🙌</p>
