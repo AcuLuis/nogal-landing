@@ -1,5 +1,6 @@
 // Servidor estático mínimo para desarrollo local (sin dependencias).
-// Uso: node scripts/serve.mjs [puerto]   →   http://localhost:8080
+// Uso: node scripts/serve.mjs [puerto] [--open]   →   http://localhost:8080
+import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve, sep } from "node:path";
@@ -49,10 +50,40 @@ export function createStaticServer(root, routes = {}, headers = {}) {
   });
 }
 
+function openBrowser(url) {
+  const cmd = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]]
+    : process.platform === "darwin" ? ["open", [url]]
+    : ["xdg-open", [url]];
+  try { spawn(cmd[0], cmd[1], { stdio: "ignore", detached: true }).unref(); }
+  catch { /* sin navegador: basta con la URL en consola */ }
+}
+
+/* Uso: node scripts/serve.mjs [puerto] [--open]
+   Si el puerto está ocupado prueba los 10 siguientes. --open abre el
+   navegador (se omite si NOGAL_NO_OPEN está definido). */
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const port = Number(process.argv[2]) || 8080;
+  const args = process.argv.slice(2);
+  const first = Number(args.find((a) => /^\d+$/.test(a))) || 8080;
+  const shouldOpen = args.includes("--open") && !process.env.NOGAL_NO_OPEN;
   const root = fileURLToPath(new URL("../frontend/", import.meta.url));
-  createStaticServer(root).listen(port, "127.0.0.1", () => {
-    console.log(`NOGAL en http://localhost:${port}  (Ctrl+C para salir)`);
-  });
+
+  const tryListen = (port) => {
+    const server = createStaticServer(root);
+    server.once("error", (err) => {
+      if (err.code === "EADDRINUSE" && port < first + 10) {
+        console.log(`El puerto ${port} está ocupado, probando ${port + 1}…`);
+        tryListen(port + 1);
+      } else {
+        console.error(`No se pudo iniciar el servidor: ${err.message}`);
+        process.exit(1);
+      }
+    });
+    server.listen(port, "127.0.0.1", () => {
+      const url = `http://localhost:${port}`;
+      console.log(`\nNOGAL está corriendo en ${url}`);
+      console.log("Cierra esta ventana o pulsa Ctrl+C para detenerlo.\n");
+      if (shouldOpen) openBrowser(url);
+    });
+  };
+  tryListen(first);
 }

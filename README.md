@@ -154,6 +154,7 @@ nogal-landing/
 ├─ docs/
 │  ├─ produccion.md              # Guía para pasar de demo a producción
 │  └─ screenshots/
+├─ iniciar.bat                   # Lanzador para Windows (doble clic)
 ├─ package.json
 ├─ LICENSE
 └─ README.md
@@ -165,9 +166,21 @@ nogal-landing/
 
 Requisitos: **Node.js 22 o superior**. No hay dependencias que instalar.
 
+**En Windows** basta con hacer doble clic en `iniciar.bat`. Muestra un menú para abrir la landing en el
+navegador o ejecutar las pruebas. También acepta un argumento para ir directo a una opción:
+
+```bat
+iniciar.bat web       :: levanta el sitio y abre el navegador
+iniciar.bat pruebas   :: ejecuta todas las pruebas
+```
+
+**En cualquier sistema:**
+
 ```bash
 npm start          # http://localhost:8080
 ```
+
+Si el puerto 8080 está ocupado, el servidor usa automáticamente el siguiente libre y lo indica en consola.
 
 También sirve cualquier servidor estático, por ejemplo `cd frontend && python -m http.server 8080`.
 
